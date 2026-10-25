@@ -114,10 +114,16 @@ function pick(){return fetch('https://generativelanguage.googleapis.com/v1beta/m
  var n=(j.models||[]).filter(function(m){return (m.supportedGenerationMethods||[]).indexOf('generateContent')>-1&&/flash/.test(m.name)&&!/lite|image|tts|live|audio|embed|exp|preview|thinking/.test(m.name)}).map(function(m){return m.name.replace('models/','')}).sort().reverse();
  if(!n.length)throw new Error('কোনো উপযুক্ত মডেল পাওয়া যায়নি, API Key ঠিক আছে কি না দেখুন');
  S.model=n[0];try{localStorage.setItem('nv_cfg',JSON.stringify(S))}catch(e){}})}
-function gem(contents,sys,again){var b={contents:contents};if(sys)b.systemInstruction={parts:[{text:sys}]};
- var ac=new AbortController(),tm=setTimeout(function(){ac.abort()},45000);return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(S.model||'gemini-3.8-flash')+':generateContent?key='+encodeURIComponent(S.key),{method:'POST',signal:ac.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify(b)})
+function gem(contents,sys,again,mdl){var b={contents:contents};if(sys)b.systemInstruction={parts:[{text:sys}]};
+ var ac=new AbortController(),tm=setTimeout(function(){ac.abort()},40000);
+ return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(mdl||S.model||'gemini-3.8-flash')+':generateContent?key='+encodeURIComponent(S.key),{method:'POST',signal:ac.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify(b)})
  .then(function(r){clearTimeout(tm);return r.json().then(function(j){if(!r.ok)throw new Error((j.error&&j.error.message)||'অনুরোধ ব্যর্থ');var c=j.candidates&&j.candidates[0],t=c&&c.content&&c.content.parts?c.content.parts.map(function(p){return p.text||''}).join(''):'';if(!t)throw new Error('এআই উত্তর দেয়নি, অন্যভাবে লিখে আবার চেষ্টা করুন');return t})})
- .catch(function(e){clearTimeout(tm);if(e.name==='AbortError')throw new Error('৪৫ সেকেন্ডেও উত্তর আসেনি। ইন্টারনেট ধীর, অথবা Key বা মডেলে সমস্যা। সেটিংয়ে "Key পরীক্ষা করুন" চাপুন');if(!again&&/no longer available|not found|not supported|404/i.test(e.message))return pick().then(function(){return gem(contents,sys,true)});throw e})}
+ .catch(function(e){clearTimeout(tm);
+  var slow=e.name==='AbortError'||/overloaded|unavailable|high demand|try again|quota|rate|429|500|503/i.test(e.message);
+  if(slow&&!mdl)return gem(contents,sys,again,'gemini-flash-lite-latest');
+  if(e.name==='AbortError')throw new Error('উত্তর আসতে অনেক দেরি হচ্ছে। ইন্টারনেট বা Google সার্ভারে চাপ। একটু পরে আবার চেষ্টা করুন');
+  if(!again&&!mdl&&/no longer available|not found|not supported|404/i.test(e.message))return pick().then(function(){return gem(contents,sys,true)});
+  throw e})}
 var SYS={chat:'ব্যবহারকারী যে ভাষায় লেখে সেই ভাষায় উত্তর দাও। বাংলায় লিখলে সহজ স্বাভাবিক বাংলায় বন্ধুর মতো কথা বলো। তুমি NURVO AI।',
  code:'তুমি দক্ষ সফটওয়্যার ইঞ্জিনিয়ার। সম্পূর্ণ, চালানোর উপযোগী কোড দাও, সবসময় ভাষার নাম সহ ``` ব্লকে। কোডের আগে-পরে ব্যবহারকারীর ভাষায় ছোট ব্যাখ্যা দাও। তুমি NURVO AI।'};
 function send(txt){var text=(txt||inp.value).trim();if((!text&&!pend)||busy)return;if(!S.key){dlg.showModal();return}
